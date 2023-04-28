@@ -205,6 +205,28 @@ std::vector<Type> &solution, std::size_t startIndex){
 }
 
 template<typename Type>
+SOLUTION_FLAG uniDimTridiagonalAlgoritm(const std::vector<Type> &diag, std::vector<Type> &lDiag, std::vector<Type> &uDiag, const std::vector<Type> &rVec, 
+std::vector<Type> &solution, std::size_t dim){
+    std::size_t diagSize = diag.size();
+    if (dim > diagSize || lDiag.size() != diagSize - 1 || uDiag.size() != diagSize - 1 || rVec.size() != diagSize){
+        return NO_SOLUTION;
+    }
+    solution.resize(diagSize);
+    std::vector<Type> alpha = {-uDiag[0] / diag[0]};
+    std::vector<Type> beta = {rVec[0] / diag[0]};
+    for (std::size_t i = 1; i < dim - 1; i++){
+        Type c = diag[i] + lDiag[i - 1] * alpha[i - 1];
+        alpha.push_back(-uDiag[i] / c); 
+        beta.push_back((rVec[i] - lDiag[i - 1] * beta[i - 1]) / c);
+    }
+    solution[dim - 1] = (rVec[dim - 1] - lDiag[dim - 2] * beta[dim - 2]) / (diag[dim - 1] + lDiag[dim - 2] * alpha[dim - 2]);
+    for (int i = dim - 2; i >= 0; i--){
+        solution[i] = alpha[i] * solution[i + 1] + beta[i];
+    }
+    return HAS_SOLUTION;
+}
+
+template<typename Type>
 SOLUTION_FLAG qrMethod(std::vector<std::vector<Type>> &lCoefs, std::vector<Type> &rCoefs, std::vector<Type> &solution, Type accuracy){
     std::size_t rows = lCoefs.size(); // Количество строк в СЛАУ
     solution.resize(rows); // Искомое решение
@@ -4567,9 +4589,44 @@ std::size_t numOfXIntervals, std::size_t numOfTimeIntervals, Type(*U0)(Type x), 
 
 // Лаб 4
 
+template<typename Type>
+Type maxVecElem(std::vector<Type> vec){
+    std::size_t size = vec.size();
+    if (!size){
+        return NAN;
+    }
+    Type max = vec[0];
+    for (std::size_t i = 0; i < size; i++){
+        if (max < vec[i]){
+            max = vec[i];
+        }
+    }
+    return max;
+}
+
+template<typename Type>
+Type normC2Ddiff(const std::vector<std::vector<Type>> &m1, const std::vector<std::vector<Type>> &m2){
+    std::size_t rows = m1.size();
+    if (rows != m2.size()){
+        return NAN;
+    }
+    std::size_t cols = m1[0].size();
+    if (cols != m2[0].size()){
+        return NAN;
+    }
+    std::vector<Type> diffM(rows * cols);
+    for (std::size_t i = 0; i < rows; i++){
+        for (std::size_t j = 0; j < cols; j++){
+            diffM[i * cols + j] = std::abs(m1[i][j] - m2[i][j]);
+        }
+    }
+    return maxVecElem(diffM);
+}
+
+
 template <typename Type>
-FILE_FLAG get2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, Type lastTimeIter,
-std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*U0)(Type x, Type y),  Type(*f)(Type x, Type y)){
+Type get2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau,
+std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*U0)(Type x, Type y), Type (*xi)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){
 
     // Шаги сеток по X и Y соответсвенно 
     Type h1 = L1 / numOfXIntervals;
@@ -4578,85 +4635,170 @@ std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*U0)(Type x, Type
     // Переменные, чтобы не пересчитывать умножения и деления
     Type coef1 = 1.0 / std::pow(h1, 2.0);
     Type coef2 = 1.0 / std::pow(h2, 2.0);
-    Type coefSys = -2.0 * (coef1 + 1.0 / tau);
-
-    std::vector<std::vector<Type>> phi(numOfXIntervals); // Сеточная проекция функции f(x, y)
-    for (std::size_t i = 0; i < numOfXIntervals; i++){
-        for (std::size_t j = 0; j < numOfYIntervals; j++){
-            phi[i].push_back(f(i * h1, j * h2));
-        }
-    }
+    Type coefSys1 = -2.0 * (coef1 + 1.0 / tau);
+    Type coefSys2 = -2.0 * (coef2 + 1.0 / tau);
     
-    // Первая итерация 
-    std::size_t n = std::max(numOfXIntervals, numOfYIntervals);
+    // Вектора для прогонки
+    std::size_t n = std::max(numOfXIntervals, numOfYIntervals) + 1;
     std::vector<Type> lowDiag(n - 1);
     std::vector<Type> mainDiag(n);
     std::vector<Type> upDiag(n - 1);
     std::vector<Type> fVec(n);
-    std::vector<Type> tempSol(n);
-    std::vector<std::vector<Type>> solutionMatrix(numOfXIntervals);
 
-    // Нахожденние получцелого временного слоя 
-    
-    std::fstream file;
-    file.open(solutionFile);
-    if (!file.is_open()){
-        return NOT_OPEN;
+    // Матрицы решений
+    std::vector<std::vector<Type>> solMatrix(numOfXIntervals + 1);
+    std::vector<std::vector<Type>> solMatrixPrev(numOfXIntervals + 1);
+    for (std::size_t i = 0; i < numOfXIntervals + 1; i++){ 
+        Type temp;
+        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+            temp = U0(i * h1, j * h2);
+            solMatrix[i].push_back(temp);
+            solMatrixPrev[i].push_back(temp);
+        }
     }
-    for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
-        file << U0(i * h1, 0.0) << '\t';
-    }
-    file << '\n';
-    
 
-    // Заполнение диагоналей матрицы системы
+    // Первая итерация
+
+    // Проход вдоль Ox2
     mainDiag[0] = 1.0;
-    upDiag[0] = 0.0; 
-    for (std::size_t i = 1; i < numOfXIntervals - 2; i++){
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
+        mainDiag[i] = coefSys1;
+    }
+    mainDiag[numOfXIntervals] = 1.0;
+
+    for (std::size_t i = 0; i < numOfXIntervals - 1; i++){
         lowDiag[i] = coef1;
+    }
+    lowDiag[numOfXIntervals - 1] = 0.0;
+
+    upDiag[0] = 0.0;
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
         upDiag[i] = coef1;
-        mainDiag[i] = coefSys;
     }
-    mainDiag[numOfXIntervals - 2] = coefSys;
-    lowDiag[numOfXIntervals - 2] = 0.0;
-    mainDiag[numOfXIntervals - 1] = 1.0;
-    
-    for (std::size_t j = 1; j < numOfYIntervals - 1; j++){
-        fVec[0] = U0(0.0, j * h2); // Левое граничное условие 
-        for (std::size_t i = 1; i < numOfXIntervals - 1; i++){ // Заполнение вектора правой части для регулярных точек
-            fVec[i] = - 2.0 / tau * U0(i * h1, j * h2) - coef2 * (U0(i * h1, (j - 1) * h2) - 2.0 * U0(i * h1, j * h2) + U0(i * h1, (j + 1) * h2))  - f(i * h1, j * h2);
+
+    std::vector<Type> tempVec(n);
+    for (std::size_t j = 1; j < numOfYIntervals; j++){
+        fVec[0] = xi(0.0, j * h2); // Левое граничное условие 
+        for (std::size_t i = 1; i < numOfXIntervals; i++){ // Заполнение вектора правой части для регулярных точек
+            fVec[i] = - 2.0 / tau * solMatrixPrev[i][j] - coef2 * (solMatrixPrev[i][j - 1] - 2.0 * solMatrixPrev[i][j] + solMatrixPrev[i][j + 1]) - f(i * h1, j * h2);
         }
-        fVec[numOfXIntervals - 1] = U0(L1, j * h2); // Правое граничное условие
-        tridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempSol);
+        fVec[numOfXIntervals] = xi(L1, j * h2); // Правое граничное условие
+        uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfXIntervals + 1);
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
-            file << tempSol[i] << '\t';
+            solMatrix[i][j] = tempVec[i];
         }
-        file << '\n';
     }
 
-    for (std::size_t i = 1; i < numOfXIntervals - 1; i++){
-        fVec[0] = U0(i * h1, 0.0); // Левое граничное условие 
-        for (std::size_t j = 1; j < numOfYIntervals - 1; j++){ // Заполнение вектора правой части для регулярных точек
-            fVec[j] = - 2.0 / tau * U0(i * h1, j * h2) - coef1 * (U0((i - 1) * h1, j * h2) - 2.0 * U0(i * h1, j * h2) + U0((i + 1) * h1, j * h2))  - f(i * h1, j * h2);
-        }
-        fVec[numOfXIntervals - 1] = U0(L1, j * h2); // Правое граничное условие
-        tridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempSol);
+    solMatrixPrev = solMatrix;
+
+    // Проход вдоль Ox1
+    mainDiag[0] = 1.0;
+    for (std::size_t i = 1; i < numOfYIntervals; i++){
+        mainDiag[i] = coefSys2;
+    }
+    mainDiag[numOfYIntervals] = 1.0;
+
+    for (std::size_t i = 0; i < numOfYIntervals - 1; i++){
+        lowDiag[i] = coef2;
+    }
+    lowDiag[numOfYIntervals - 1] = 0.0;
+
+    upDiag[0] = 0.0;
+    for (std::size_t i = 1; i < numOfYIntervals; i++){
+        upDiag[i] = coef2;
     }
     
-    
-    
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
+        fVec[0] = xi(i * h1, 0.0); // Нижнее граничное условие 
+        for (std::size_t j = 1; j < numOfYIntervals; j++){ // Заполнение вектора правой части для регулярных точек
+            fVec[j] = - 2.0 / tau * solMatrixPrev[i][j] - coef1 * (solMatrixPrev[i - 1][j] - 2.0 * solMatrixPrev[i][j] + solMatrixPrev[i + 1][j])  - f(i * h1, j * h2);
+        }
+        fVec[numOfYIntervals] = xi(i * h1, L2); // Верхнее граничное условие
+        uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfYIntervals + 1);
+        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+            solMatrix[i][j] = tempVec[j];
+        }
+    }
 
-    for (std::size_t k = 0; k < lastTimeIter; k++){
+
+    ////////////////////////////////////////
+    size_t nIt = 10000;
+    size_t it = 0;
+
+
+    Type norm = normC2Ddiff(solMatrix, solMatrixPrev); 
+    while (norm > eps){
+        it++;
+        solMatrixPrev = solMatrix;
+
+        // Проход вдоль Ox2
+        mainDiag[0] = 1.0;
+        for (std::size_t i = 1; i < numOfXIntervals; i++){
+            mainDiag[i] = coefSys1;
+        }
+        mainDiag[numOfXIntervals] = 1.0;
+
+        for (std::size_t i = 0; i < numOfXIntervals - 1; i++){
+            lowDiag[i] = coef1;
+        }
+        lowDiag[numOfXIntervals - 1] = 0.0;
+
+        upDiag[0] = 0.0;
+        for (std::size_t i = 1; i < numOfXIntervals; i++){
+            upDiag[i] = coef1;
+        }
+    
+        for (std::size_t j = 1; j < numOfYIntervals; j++){
+            fVec[0] = xi(0.0, j * h2); // Левое граничное условие 
+            for (std::size_t i = 1; i < numOfXIntervals; i++){ // Заполнение вектора правой части для регулярных точек
+                fVec[i] = - 2.0 / tau * solMatrixPrev[i][j] - coef2 * (solMatrixPrev[i][j - 1] - 2.0 * solMatrix[i][j] + solMatrixPrev[i][j + 1]) - f(i * h1, j * h2);
+            }
+            fVec[numOfXIntervals] = xi(L1, j * h2); // Правое граничное условие
+            uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfXIntervals + 1);
+            for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+                solMatrix[i][j] = tempVec[i];
+            }
+        }
+
+        solMatrixPrev = solMatrix;
+
+        // Проход вдоль Ox1
+        mainDiag[0] = 1.0;
+        for (std::size_t i = 1; i < numOfYIntervals; i++){
+            mainDiag[i] = coefSys2;
+        }
+        mainDiag[numOfYIntervals] = 1.0;
+
+        for (std::size_t i = 0; i < numOfYIntervals - 1; i++){
+            lowDiag[i] = coef2;
+        }
+        lowDiag[numOfYIntervals - 1] = 0.0;
+
+        upDiag[0] = 0.0;
+        for (std::size_t i = 1; i < numOfYIntervals; i++){
+            upDiag[i] = coef2;
+        }
+
+        for (std::size_t i = 1; i < numOfXIntervals; i++){
+            fVec[0] = xi(i * h1, 0.0); // Нижнее граничное условие 
+            for (std::size_t j = 1; j < numOfYIntervals; j++){ // Заполнение вектора правой части для регулярных точек
+                fVec[j] = - 2.0 / tau * solMatrixPrev[i][j] - coef1 * (solMatrixPrev[i - 1][j] - 2.0 * solMatrixPrev[i][j] + solMatrixPrev[i + 1][j])  - f(i * h1, j * h2);
+            }
+            fVec[numOfYIntervals] = xi(i * h1, L2); // Верхнее граничное условие
+            uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfYIntervals + 1);
+            for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+                solMatrix[i][j] = tempVec[j];
+            }
+        }
+        norm = normC2Ddiff(solMatrix, solMatrixPrev);  
+        if (nIt == it){
+            int a = 2909;
+            std::cout << norm;
+        }
         
-
-
-
-
     }
     
-
-
-    // Закрываем файл решения
-    file.close();
-    return IS_CLOSED;
+    // Вывод в файл решения
+    writeMatrixFile(solMatrix, solutionFile);
+    return norm;
 }

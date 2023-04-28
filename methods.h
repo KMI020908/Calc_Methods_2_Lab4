@@ -31,6 +31,10 @@ SOLUTION_FLAG subTridiagonalAlgoritm(const std::vector<Type> &diag, std::vector<
 std::vector<Type> &solution, std::size_t startIndex = 0);
 
 template<typename Type>
+SOLUTION_FLAG uniDimTridiagonalAlgoritm(const std::vector<Type> &diag, std::vector<Type> &lDiag, std::vector<Type> &uDiag, const std::vector<Type> &rVec, 
+std::vector<Type> &solution, std::size_t dim);
+
+template<typename Type>
 std::size_t simpleItMethod(const std::vector<std::vector<Type>> &lCoefs, const std::vector<Type> &rCoefs, const std::vector<Type> 
 &firstVec, std::vector<Type> &solution, Type tao, Type accuracy = 1e-7, double p = 2.0, Type epsilon_0 = 1e-4, std::size_t stopIt = 100000);
 
