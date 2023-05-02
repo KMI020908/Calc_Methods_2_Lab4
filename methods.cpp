@@ -4705,25 +4705,30 @@ void fillTridiagMatrixOfSystem(std::size_t dim, std::vector<Type> &mDiag, std::v
 }
 
 template<typename Type>
-Type specialRightVecFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*partialDiff)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
-    return 2.0 / tau * fMatrix[i][j] + partialDiff(fMatrix, i, j, h2) + f(i * h1, j * h2);
+Type specialRightVecFuncX(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
+    return 2.0 / tau * fMatrix[i][j] + discrPartialDiffY(fMatrix, i, j, h2) + f(i * h1, j * h2);
 }
 
 template<typename Type>
-Type specialFirstCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*partialDiff)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), 
-Type (*T)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
+Type specialRightVecFuncY(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
+    return 2.0 / tau * fMatrix[i][j] + discrPartialDiffX(fMatrix, i, j, h1) + f(i * h1, j * h2);
+}
+
+template<typename Type>
+Type specialFirstCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*T)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j, 
+Type(*specialRightVecFunc)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)){
     return T(i * h1, j * h2);
 }
 
 template<typename Type>
-Type specialSecondCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*partialDiff)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), 
-Type (*Q)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
-    return -specialRightVecFunc(fMatrix, h1, h2, partialDiff, f, tau, i, j) - 2.0 / h1 * Q(i * h1 , j * h2);
+Type specialSecondCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*Q)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j,
+Type(*specialRightVecFunc)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)){
+    return -specialRightVecFunc(fMatrix, h1, h2, f, tau, i, j) - 2.0 / h1 * Q(i * h1 , j * h2);
 }
 
 template<typename Type>
-void chooseBoundFunc(Type (*& bound1)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t),
-Type (*& bound2)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t), CONDS_FLAG conds){
+void chooseBound(Type(*&bound1)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)),
+Type(*&bound2)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)), CONDS_FLAG conds){
     switch (conds){
         case LT_RT:
             bound1 = specialFirstCondFunc;
@@ -4747,18 +4752,36 @@ Type (*& bound2)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(con
 }
 
 template<typename Type>
+void chooseFunc(Type(*& func1)(Type, Type), Type(*& func2)(Type, Type), Type(*& T)(Type, Type), Type(*& Q)(Type, Type), CONDS_FLAG conds){
+    switch (conds){
+        case LT_RT:
+            func1 = T;
+            func2 = T;
+            break;
+        case LT_RQ:
+            func1 = T;
+            func2 = Q;
+            break;
+        case LQ_RT:
+            func1 = Q;
+            func2 = T;
+            break;
+        case LQ_RQ:
+            func1 = Q;
+            func2 = Q;
+            break;
+        default:
+            break;
+    }
+}
+
+template<typename Type>
 Type solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
-CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*xi)(Type x, Type y), Type (*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){
+CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type x, Type y), Type (*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){
 
     // Шаги сеток по X и Y соответсвенно 
     Type h1 = L1 / numOfXIntervals;
     Type h2 = L2 / numOfYIntervals;
-
-    // Переменные, чтобы не пересчитывать умножения и деления
-    Type coef1 = 1.0 / std::pow(h1, 2.0);
-    Type coef2 = 1.0 / std::pow(h2, 2.0);
-    Type coefSys1 = -2.0 * (coef1 + 1.0 / tau);
-    Type coefSys2 = -2.0 * (coef2 + 1.0 / tau);
     
     // Вектора для прогонки
     std::size_t n = std::max(numOfXIntervals, numOfYIntervals) + 1;
@@ -4779,13 +4802,21 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*xi)(Type
         }
     }
 
-    // Функции, отвечающие за граничные условия
-    Type (*boundLeft)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t) = nullptr;
-    Type (*boundRight)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t) = nullptr;
-    Type (*boundTop)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t) = nullptr;
-    Type (*boundBottom)(const std::vector<std::vector<Type>>&, Type, Type, Type (*)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type), Type (*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t) = nullptr;
-    chooseBoundFunc(boundLeft, boundRight, condsX);
-    chooseBoundFunc(boundTop, boundBottom, condsY);
+    // Функции, отвечающие за вид вектора правой части при разных ГУ
+    Type (*boundLeft)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;
+    Type (*boundRight)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;    
+    Type (*boundTop)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;    
+    Type (*boundBottom)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;
+    chooseBound(boundTop, boundBottom, condsX);
+    chooseBound(boundLeft, boundRight, condsY);
+
+    // Функции, отвечающие за функцию, действующую на стенку при разных ГУ
+    Type (*funcLeft)(Type, Type) = nullptr;
+    Type (*funcRight)(Type, Type) = nullptr;
+    Type (*funcTop)(Type, Type) = nullptr;
+    Type (*funcBottom)(Type, Type) = nullptr;
+    chooseFunc(funcTop, funcBottom, T, Q, condsX);
+    chooseFunc(funcLeft, funcRight, T, Q, condsY);
 
     // Первая итерация
     std::vector<Type> tempVec(n);
@@ -4793,11 +4824,11 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*xi)(Type
     // Проход вдоль Ox2
     fillTridiagMatrixOfSystem(numOfXIntervals + 1, mainDiag, lowDiag, upDiag, h1, tau, condsX);
     for (std::size_t j = 1; j < numOfYIntervals; j++){
-        fVec[0] = boundLeft(solMatrixPrev, h1, h2, discrPartialDiffY, xi, f, tau, 0, j); // Левое граничное условие 
+        fVec[0] = boundTop(solMatrixPrev, h1, h2, funcTop, f, tau, 0, j, specialRightVecFuncX);  // Верхнее граничное условие 
         for (std::size_t i = 1; i < numOfXIntervals; i++){ // Заполнение вектора правой части для регулярных точек
-            fVec[i] = -specialRightVecFunc(solMatrixPrev, h1, h2, discrPartialDiffY, f, tau, i, j);
+            fVec[i] = -specialRightVecFuncX(solMatrixPrev, h1, h2, f, tau, i, j);
         }
-        fVec[numOfXIntervals] = boundRight(solMatrixPrev, h1, h2, discrPartialDiffY, xi, f, tau, numOfXIntervals, j); // Правое граничное условие
+        fVec[numOfXIntervals] = boundBottom(solMatrixPrev, h1, h2, funcBottom, f, tau, numOfXIntervals, j, specialRightVecFuncX); // Нижнее граничное условие
         uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfXIntervals + 1);
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
             solMatrix[i][j] = tempVec[i];
@@ -4809,11 +4840,11 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*xi)(Type
     // Проход вдоль Ox1
     fillTridiagMatrixOfSystem(numOfYIntervals + 1, mainDiag, lowDiag, upDiag, h2, tau, condsY);
     for (std::size_t i = 1; i < numOfXIntervals; i++){
-        fVec[0] = boundTop(solMatrixPrev, h2, h1, discrPartialDiffX, xi, f, tau, i, 0); // Нижнее граничное условие 
+        fVec[0] = boundLeft(solMatrixPrev, h1, h2, funcLeft, f, tau, i, 0, specialRightVecFuncY); // Верхнее граничное условие 
         for (std::size_t j = 1; j < numOfYIntervals; j++){ // Заполнение вектора правой части для регулярных точек
-            fVec[j] = - 2.0 / tau * solMatrixPrev[i][j] - coef1 * (solMatrixPrev[i - 1][j] - 2.0 * solMatrixPrev[i][j] + solMatrixPrev[i + 1][j])  - f(i * h1, j * h2);
+            fVec[j] = -specialRightVecFuncY(solMatrixPrev, h1, h2, f, tau, i, j);
         }
-        fVec[numOfYIntervals] = xi(i * h1, L2); // Верхнее граничное условие
+        fVec[numOfYIntervals] = boundRight(solMatrixPrev, h1, h2, funcRight, f, tau, i, numOfYIntervals, specialRightVecFuncY); // Нижнее граничное условие
         uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfYIntervals + 1);
         for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
             solMatrix[i][j] = tempVec[j];
@@ -4827,13 +4858,12 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*xi)(Type
 
         // Проход вдоль Ox2
         fillTridiagMatrixOfSystem(numOfXIntervals + 1, mainDiag, lowDiag, upDiag, h1, tau, condsX);
-    
         for (std::size_t j = 1; j < numOfYIntervals; j++){
-            fVec[0] = xi(0.0, j * h2); // Левое граничное условие 
+            fVec[0] = boundTop(solMatrixPrev, h1, h2, funcTop, f, tau, 0, j, specialRightVecFuncX);  // Верхнее граничное условие 
             for (std::size_t i = 1; i < numOfXIntervals; i++){ // Заполнение вектора правой части для регулярных точек
-                fVec[i] = - 2.0 / tau * solMatrixPrev[i][j] - coef2 * (solMatrixPrev[i][j - 1] - 2.0 * solMatrix[i][j] + solMatrixPrev[i][j + 1]) - f(i * h1, j * h2);
+                fVec[i] = -specialRightVecFuncX(solMatrixPrev, h1, h2, f, tau, i, j);
             }
-            fVec[numOfXIntervals] = xi(L1, j * h2); // Правое граничное условие
+            fVec[numOfXIntervals] = boundBottom(solMatrixPrev, h1, h2, funcBottom, f, tau, numOfXIntervals, j, specialRightVecFuncX); // Нижнее граничное условие
             uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfXIntervals + 1);
             for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
                 solMatrix[i][j] = tempVec[i];
@@ -4844,18 +4874,18 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*xi)(Type
 
         // Проход вдоль Ox1
         fillTridiagMatrixOfSystem(numOfYIntervals + 1, mainDiag, lowDiag, upDiag, h2, tau, condsY);
-
         for (std::size_t i = 1; i < numOfXIntervals; i++){
-            fVec[0] = xi(i * h1, 0.0); // Нижнее граничное условие 
+            fVec[0] = boundLeft(solMatrixPrev, h1, h2, funcLeft, f, tau, i, 0, specialRightVecFuncY); // Верхнее граничное условие 
             for (std::size_t j = 1; j < numOfYIntervals; j++){ // Заполнение вектора правой части для регулярных точек
-                fVec[j] = - 2.0 / tau * solMatrixPrev[i][j] - coef1 * (solMatrixPrev[i - 1][j] - 2.0 * solMatrixPrev[i][j] + solMatrixPrev[i + 1][j])  - f(i * h1, j * h2);
+                fVec[j] = -specialRightVecFuncY(solMatrixPrev, h1, h2, f, tau, i, j);
             }
-            fVec[numOfYIntervals] = xi(i * h1, L2); // Верхнее граничное условие
+            fVec[numOfYIntervals] = boundRight(solMatrixPrev, h1, h2, funcRight, f, tau, i, numOfYIntervals, specialRightVecFuncY); // Нижнее граничное условие
             uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfYIntervals + 1);
             for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
                 solMatrix[i][j] = tempVec[j];
             }
         }
+
         norm = normC2Ddiff(solMatrix, solMatrixPrev);  
     }
     
