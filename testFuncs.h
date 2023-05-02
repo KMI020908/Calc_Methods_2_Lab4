@@ -3,6 +3,11 @@
 #define TEST_FUNC_H
 #include<cmath>
 
+template<typename Type>
+Type defaultFunc(Type x, Type y){
+    return 0.0;
+}
+
 // Первый тест из методички 
 template<typename Type>
 Type f1(Type x, Type y){

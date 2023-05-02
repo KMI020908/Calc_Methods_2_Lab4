@@ -64,4 +64,9 @@ enum CONDS_FLAG{
     LQ_RQ   // 3 - Поток на обоих концах
 };
 
+enum AXIS_FLAG{
+    OX, // 0 - проход вдоль Ox
+    OY // 1 - проход вдоль Oy
+};
+
 #endif 

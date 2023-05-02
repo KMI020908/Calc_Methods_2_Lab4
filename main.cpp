@@ -8,23 +8,24 @@
 
 // Процедура для заполнения названий файла
 void getFileNames(std::size_t numOfEq, std::string &SOLUTION_FILE, std::string &DATA_FILE, std::string &INTERVAL_FILE){
-    SOLUTION_FILE = "D:\\Calc_Methods_2\\Lab3\\CrossScheme\\solution" + std::to_string(numOfEq) + ".txt";
-    DATA_FILE = "D:\\Calc_Methods_2\\Lab3\\CrossScheme\\data" + std::to_string(numOfEq) + ".txt";
-    INTERVAL_FILE = "D:\\Calc_Methods_2\\Lab3\\CrossScheme\\interval" + std::to_string(numOfEq) + ".txt";
+    SOLUTION_FILE = "D:\\Calc_Methods_2\\Lab4\\Solutions\\solution" + std::to_string(numOfEq) + ".txt";
+    DATA_FILE = "D:\\Calc_Methods_2\\Lab4\\Solutions\\data" + std::to_string(numOfEq) + ".txt";
+    INTERVAL_FILE = "D:\\Calc_Methods_2\\Lab4\\Solutions\\interval" + std::to_string(numOfEq) + ".txt";
 }
 
-// Решенние уравнений при разных sigma
+// Решенние уравнения Пуассона
 template<typename Type>
-void getWaveEquationSolution(std::size_t numOfEq, Type a, Type L, Type timeEnd,
-std::size_t numOfXIntervals, std::size_t numOfTimeIntervals,  Type(*U0)(Type x), Type(*Ut0)(Type x), Type(*bound1)(Type t), Type(*bound2)(Type t), Type x0 = 0.0){ 
+void getPoisson2DEquationSolution(std::size_t numOfEq, Type L1, Type L2, Type tau,
+std::size_t numOfXIntervals, std::size_t numOfYIntervals, CONDS_FLAG condsX, CONDS_FLAG condsY, 
+Type(*U0)(Type x, Type y), Type(*xi)(Type x, Type y), Type(*psi)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){ 
     std::string SOLUTION_FILE;
     std::string DATA_FILE;
     std::string INTERVAL_FILE;
-    std::vector<Type> dataVec = {a, L, timeEnd, x0};
-    std::vector<std::size_t> numOfIntervalsVec = {numOfXIntervals, numOfTimeIntervals};
+    std::vector<Type> dataVec = {L1, L2, tau, eps};
+    std::vector<std::size_t> numOfIntervalsVec = {numOfXIntervals, numOfYIntervals};
     
     getFileNames(numOfEq, SOLUTION_FILE, DATA_FILE, INTERVAL_FILE);
-    solveWaveEquation(SOLUTION_FILE, a, L, timeEnd, numOfXIntervals, numOfTimeIntervals, U0, Ut0, bound1, bound2, x0);
+    solve2DStationaryPoissonEquation(SOLUTION_FILE, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, xi, psi, f, eps);
     writeVectorFile(dataVec, DATA_FILE);
     writeVectorFile(numOfIntervalsVec, INTERVAL_FILE);
 }
@@ -43,22 +44,27 @@ void temp_main(){
     std::size_t numOfEq;
     Type L1, L2, tau, eps;
     std::size_t numOfXIntervals, numOfYIntervals;
+    CONDS_FLAG condsX, condsY;
     Type (*U0)(Type x, Type y) = nullptr;
     Type (*xi)(Type x, Type y) = nullptr;
+    Type (*psi)(Type x, Type y) = nullptr;
     Type (*f)(Type x, Type y) = nullptr;
 
     // Первый тест 
+    numOfEq = 1;
     L1 = 1.0;
     L2 = 1.0;
     f = f1;
     xi = xi1;
+    psi = defaultFunc;
     U0 = U01;
     tau = 0.5;
-    numOfXIntervals = 20;
-    numOfYIntervals = 10;
+    numOfXIntervals = 10;
+    numOfYIntervals = 20;
+    condsX = LT_RT;
+    condsY = LT_RT;
     eps = 1e-2;
-
-    get2DStationaryPoissonEquation("tmp.txt", L1, L2, tau, numOfXIntervals, numOfYIntervals, U0, xi, f, eps);
+    getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, xi, psi, f, eps);
 }
 
 int main(){
@@ -82,7 +88,7 @@ int main(){
     std::cout << '\n' << '\n';
     
     std::cout << normC2Ddiff(m1, m2);
-    */
+    
    std::vector<double> diag(5), lDiag(4), uDiag(4), fVec(5);
    std::size_t dim = 4;
    diag[0] = 1.0; diag[1] = 2.0; diag[2] = 7.0; diag[3] = 9.0;
@@ -95,8 +101,7 @@ int main(){
    
    uniDimTridiagonalAlgoritm(diag, lDiag, uDiag, fVec, solVec, dim);
    std::cout << solVec << '\n';
-
-
+   */
 
     return 0;
 }
