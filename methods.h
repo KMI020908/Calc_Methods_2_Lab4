@@ -401,43 +401,7 @@ template<typename Type>
 Type normC2Ddiff(const std::vector<std::vector<Type>> &m1, const std::vector<std::vector<Type>> &m2);
 
 template<typename Type>
-Type discrPartialDiffX(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type h);
-
-template<typename Type>
-Type discrPartialDiffY(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type h);
-
-template<typename Type>
-void fillTridiagMatrixOfSystem(std::size_t dim, std::vector<Type> &mDiag, std::vector<Type> &lDiag, std::vector<Type> &uDiag, Type h, Type tau, CONDS_FLAG conds);
-
-template<typename Type>
-Type specialRightVecFuncX(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j);
-
-template<typename Type>
-Type specialRightVecFuncY(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j);
-
-template<typename Type>
-Type specialFirstCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*T)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j, 
-Type(*specialRightVecFunc)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t));
-
-template<typename Type>
-Type specialSecondCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*Q)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j,
-Type(*specialRightVecFunc)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t));
-
-template<typename Type>
-void chooseBound(Type(*&bound1)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)),
-Type(*&bound2)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)), CONDS_FLAG conds);
-
-template<typename Type>
-void chooseFunc(Type(*& func1)(Type, Type), Type(*& func2)(Type, Type), Type(*& T)(Type, Type), Type(*& Q)(Type, Type), CONDS_FLAG conds);
-
-template<typename Type>
-void fillSolMatrixBoundX(std::vector<std::vector<Type>> &solMatrix, Type h1, Type h2, std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*T)(Type, Type), CONDS_FLAG condsX);
-
-template<typename Type>
-void fillSolMatrixBoundYU(std::vector<std::vector<Type>> &solMatrix, Type h1, Type h2, std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*T)(Type, Type), CONDS_FLAG condsY);
-
-template<typename Type>
-Type solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
+std::size_t solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type x, Type y), Type (*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps);
 
 #endif

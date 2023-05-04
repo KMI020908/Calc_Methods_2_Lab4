@@ -4682,7 +4682,7 @@ Type secondPartialDiffYBackward(const std::vector<std::vector<Type>> &fMatrix, s
 
 // Заполняем элементы матрицы на границе, если задана температура
 template<typename Type>
-void fillBoundMatrixElems(const std::vector<std::vector<Type>> &matrix, Type (*T)(Type, Type), const std::vector<BOUND_FLAG> &condsX, Type h1, const std::vector<BOUND_FLAG> &condsY, Type h2){
+void fillBoundMatrixElems(std::vector<std::vector<Type>> &matrix, Type (*T)(Type, Type), const std::vector<BOUND_FLAG> &condsX, Type h1, const std::vector<BOUND_FLAG> &condsY, Type h2){
     std::size_t numOfXIntervals = matrix.size() - 1;
     std::size_t numOfYIntervals = matrix[0].size() - 1;
 
@@ -4749,7 +4749,7 @@ Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPa
         lowDiag[i - 1] = 1.0 / std::pow(hX, 2.0);
         mainDiag[i] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
         upDiag[i] = 1.0 / std::pow(hX, 2.0);
-        f[i] = -2.0 / tau * matrix[i][j] - secondPartialDiffY(matrix, i, j, hX, hY, Q) - f(i * hX, j * hY);
+        fVec[i] = -2.0 / tau * matrix[i][j] - secondPartialDiffY(matrix, i, j, hX, hY, Q) - f(i * hX, j * hY);
     }
 
     if (condsY[1] == Temp){
@@ -4799,7 +4799,7 @@ Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPa
         lowDiag[j - 1] = 1.0 / std::pow(hY, 2.0);
         mainDiag[j] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
         upDiag[j] = 1.0 / std::pow(hY, 2.0); 
-        f[j] = -2.0 / tau * matrix[i][j] - secondPartialDiffX(matrix, i, j, hX, hY, Q) - f(i * hX, j * hY);
+        fVec[j] = -2.0 / tau * matrix[i][j] - secondPartialDiffX(matrix, i, j, hX, hY, Q) - f(i * hX, j * hY);
     }
 
     if (condsX[1] == Temp){
@@ -4815,9 +4815,33 @@ Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPa
     uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfYIntervals + 1);
 }
 
+void fillCondsVec(std::vector<BOUND_FLAG> &condsVec, CONDS_FLAG conds){
+    condsVec.resize(2);
+    switch (conds){
+        case LT_RT:
+            condsVec[0] = Temp;
+            condsVec[1] = Temp;
+            break;
+        case LT_RQ:
+            condsVec[0] = Temp;
+            condsVec[1] = Flux;
+            break;
+        case LQ_RT:
+            condsVec[0] = Flux;
+            condsVec[1] = Temp;
+            break;
+        case LQ_RQ:
+            condsVec[0] = Flux;
+            condsVec[1] = Flux;
+            break;
+        default:
+            break;
+        }
+}
+
 template<typename Type>
 std::size_t solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
-const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type), Type eps){
+CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type), Type eps){
     // Шаги сеток по X и Y соответсвенно 
     Type h1 = L1 / numOfXIntervals;
     Type h2 = L2 / numOfYIntervals;
@@ -4828,6 +4852,12 @@ const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Ty
     std::vector<Type> mainDiag(n);
     std::vector<Type> upDiag(n - 1);
     std::vector<Type> fVec(n);
+
+    // Создаем векторы граничных условий
+    std::vector<BOUND_FLAG> condsXVec;
+    fillCondsVec(condsXVec, condsX);
+    std::vector<BOUND_FLAG> condsYVec;
+    fillCondsVec(condsYVec, condsY);
 
     // Матрицы решений
     std::vector<std::vector<Type>> solMatrix(numOfXIntervals + 1);
@@ -4840,30 +4870,30 @@ const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Ty
             solMatrixPrev[i].push_back(temp);
         }
     }
-    fillBoundMatrixElems(solMatrix, T, condsX, h1, condsY, h2);
-    fillBoundMatrixElems(solMatrixPrev, T, condsX, h1, condsY, h2);
+    fillBoundMatrixElems(solMatrix, T, condsXVec, h1, condsYVec, h2);
+    fillBoundMatrixElems(solMatrixPrev, T, condsXVec, h1, condsYVec, h2);
 
     // Первая итерация
     std::vector<Type> tempVec(n); // Вектор для решения СЛАУ
 
     // Проход вдоль Ox2
     // Находим температуру при x2 = 0 (j = 0)
-    if (condsX[0] == Flux){
-        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYForward);
+    if (condsXVec[0] == Flux){
+        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYForward);
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
             solMatrix[i][0] = tempVec[i];
         }
     }
     // Находим температуру для 0 < j < numOfYIntervals
     for (std::size_t j = 1; j < numOfYIntervals; j++){
-        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYRegular);
+        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYRegular);
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
             solMatrix[i][j] = tempVec[i];
         }
     }
     // Находим температуру при x2 = L2 (j = numOfYIntervals)
-    if (condsX[1] == Flux){
-        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYBackward);
+    if (condsXVec[1] == Flux){
+        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYBackward);
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
             solMatrix[i][numOfYIntervals] = tempVec[i];
         }
@@ -4873,22 +4903,22 @@ const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Ty
 
     // Проход вдоль Ox1
     // Находим температуру при x1 = 0 (i = 0)
-    if (condsY[0] == Flux){
-        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXForward);
+    if (condsYVec[0] == Flux){
+        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXForward);
         for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
             solMatrix[0][j] = tempVec[j];
         }
     }
     // Находим температуру для 0 < i < numOfXIntervals
     for (std::size_t i = 1; i < numOfXIntervals; i++){
-        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXRegular);
+        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXRegular);
         for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
             solMatrix[i][j] = tempVec[j];
         }
     }
     // Находим температуру при x1 = L1 (i = numOfXIntervals)
-    if (condsY[1] == Flux){
-        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXBackward);
+    if (condsYVec[1] == Flux){
+        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXBackward);
         for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
             solMatrix[numOfXIntervals][j] = tempVec[j];
         }
@@ -4902,22 +4932,22 @@ const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Ty
 
         // Проход вдоль Ox2
         // Находим температуру при x2 = 0 (j = 0)
-        if (condsX[0] == Flux){
-            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYForward);
+        if (condsXVec[0] == Flux){
+            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYForward);
             for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
                 solMatrix[i][0] = tempVec[i];
             }
         }
         // Находим температуру для 0 < j < numOfYIntervals
         for (std::size_t j = 1; j < numOfYIntervals; j++){
-            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYRegular);
+            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYRegular);
             for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
                 solMatrix[i][j] = tempVec[i];
             }
         }
         // Находим температуру при x2 = L2 (j = numOfYIntervals)
-        if (condsX[1] == Flux){
-            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYBackward);
+        if (condsXVec[1] == Flux){
+            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYBackward);
             for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
                 solMatrix[i][numOfYIntervals] = tempVec[i];
             }
@@ -4927,22 +4957,22 @@ const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Ty
 
         // Проход вдоль Ox1
         // Находим температуру при x1 = 0 (i = 0)
-        if (condsY[0] == Flux){
-            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXForward);
+        if (condsYVec[0] == Flux){
+            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXForward);
             for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
                 solMatrix[0][j] = tempVec[j];
             }
         }
         // Находим температуру для 0 < i < numOfXIntervals
         for (std::size_t i = 1; i < numOfXIntervals; i++){
-            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXRegular);
+            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXRegular);
             for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
                 solMatrix[i][j] = tempVec[j];
             }
         }
         // Находим температуру при x1 = L1 (i = numOfXIntervals)
-        if (condsY[1] == Flux){
-            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXBackward);
+        if (condsYVec[1] == Flux){
+            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXBackward);
             for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
                 solMatrix[numOfXIntervals][j] = tempVec[j];
             }
