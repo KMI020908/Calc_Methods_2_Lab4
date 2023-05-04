@@ -431,6 +431,12 @@ template<typename Type>
 void chooseFunc(Type(*& func1)(Type, Type), Type(*& func2)(Type, Type), Type(*& T)(Type, Type), Type(*& Q)(Type, Type), CONDS_FLAG conds);
 
 template<typename Type>
+void fillSolMatrixBoundX(std::vector<std::vector<Type>> &solMatrix, Type h1, Type h2, std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*T)(Type, Type), CONDS_FLAG condsX);
+
+template<typename Type>
+void fillSolMatrixBoundYU(std::vector<std::vector<Type>> &solMatrix, Type h1, Type h2, std::size_t numOfXIntervals, std::size_t numOfYIntervals, Type(*T)(Type, Type), CONDS_FLAG condsY);
+
+template<typename Type>
 Type solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type x, Type y), Type (*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps);
 

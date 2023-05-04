@@ -4624,161 +4624,200 @@ Type normC2Ddiff(const std::vector<std::vector<Type>> &m1, const std::vector<std
     return maxVecElem(diffM);
 }
 
-// Сеточная частная производная по X
+// Сеточная вторая частная производная по X для РЕГУЛЯРНЫХ точек
 template<typename Type>
-Type discrPartialDiffX(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type h){
-    if (i == 0 || i > fMatrix.size() - 1 || j > fMatrix[i].size()){
+Type secondPartialDiffXRegular(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type)){
+    if (i == 0 || i > fMatrix.size() - 2 || j > fMatrix[i].size() - 1){
         return NAN;
     }
-    return (fMatrix[i - 1][j] - 2.0 * fMatrix[i][j] + fMatrix[i + 1][j]) / std::pow(h, 2.0);
+    return (fMatrix[i - 1][j] - 2.0 * fMatrix[i][j] + fMatrix[i + 1][j]) / std::pow(hX, 2.0);
 }
 
-// Сеточная частная производная по Y
+// Сеточная вторая частная производная по X ВПЕРЕД для НЕРЕГУЛЯРНЫХ точек
 template<typename Type>
-Type discrPartialDiffY(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type h){
-    if (j == 0 || j > fMatrix[i].size() - 1 || i > fMatrix.size()){
+Type secondPartialDiffXForward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type)){
+    if (i > fMatrix.size() - 2 || j > fMatrix[i].size() - 1){
         return NAN;
     }
-    return (fMatrix[i][j - 1] - 2.0 * fMatrix[i][j] + fMatrix[i][j + 1]) / std::pow(h, 2.0);
+    return 2.0 * ((fMatrix[i + 1][j] - fMatrix[i][j]) / hX + boundFlux(i * hX, j * hY)) / hX;
+}
+
+// Сеточная вторая частная производная по X НАЗАД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffXBackward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type)){
+    if (i == 0 || i > fMatrix.size() - 1 || j > fMatrix[i].size() - 1){
+        return NAN;
+    }
+    return 2.0 * (boundFlux(i * hX, j * hY) - (fMatrix[i][j] - fMatrix[i - 1][j]) / hX) / hX;
+}
+
+
+// Сеточная вторая частная производная по Y для РЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffYRegular(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type)){
+    if (j == 0 || i > fMatrix.size() - 1 || j > fMatrix[i].size() - 2){
+        return NAN;
+    }
+    return (fMatrix[i][j - 1] - 2.0 * fMatrix[i][j] + fMatrix[i][j + 1]) / std::pow(hY, 2.0);
+}
+
+// Сеточная вторая частная производная по Y ВПЕРЕД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffYForward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type)){
+    if (i > fMatrix.size() - 1 || j > fMatrix[i].size() - 2){
+        return NAN;
+    }
+    return 2.0 * ((fMatrix[i][j + 1] - fMatrix[i][j]) / hY + boundFlux(i * hX, j * hY)) / hY;
+}
+
+// Сеточная вторая частная производная по Y НАЗАД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffYBackward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type)){
+    if (j == 0 || i > fMatrix.size() - 1 || j > fMatrix[i].size() - 1){
+        return NAN;
+    }
+    return 2.0 * (boundFlux(i * hX, j * hY) - (fMatrix[i][j] - fMatrix[i - 1][j]) / hY) / hY;
+}
+
+
+// Заполняем элементы матрицы на границе, если задана температура
+template<typename Type>
+void fillBoundMatrixElems(const std::vector<std::vector<Type>> &matrix, Type (*T)(Type, Type), const std::vector<BOUND_FLAG> &condsX, Type h1, const std::vector<BOUND_FLAG> &condsY, Type h2){
+    std::size_t numOfXIntervals = matrix.size() - 1;
+    std::size_t numOfYIntervals = matrix[0].size() - 1;
+
+    // y = 0
+    if (condsX[0] == Temp){
+        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+            matrix[i][0] = T(i * h1, 0.0);
+        }
+    }
+
+    // y = L2
+    if (condsX[1] == Temp){
+        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+            matrix[i][numOfYIntervals] = T(i * h1, 0.0);
+        }
+    }
+
+    // x = 0
+    if (condsY[0] == Temp){
+        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+            matrix[0][j] = T(0.0, j * h2);
+        }
+    }
+
+    // x = L1
+    if (condsY[1] == Temp){
+        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+            matrix[numOfXIntervals][j] = T(0.0, j * h2);
+        }
+    }
 }
 
 template<typename Type>
-void fillTridiagMatrixOfSystem(std::size_t dim, std::vector<Type> &mDiag, std::vector<Type> &lDiag, std::vector<Type> &uDiag, Type h, Type tau, CONDS_FLAG conds){
-    if (mDiag.size() < dim){
-        mDiag.resize(dim);
-    }
-    if (lDiag.size() < dim - 1){
-        lDiag.resize(dim - 1);
-    }
-    if (uDiag.size() < dim - 1){
-        uDiag.resize(dim - 1);
-    }
+void getXTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t j, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsY, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPartialDiffY)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type))){
+    std::size_t numOfXIntervals = matrix.size();
+    std::size_t numOfYIntervals = matrix[0].size();
 
-    // Переменные, чтобы не пересчитывать умножения и деления
-    Type coefLU = 1.0 / std::pow(h, 2.0);
-    Type coefD = -2.0 * (coefLU + 1.0 / tau);
-
-    // Заполнение строк, отвечающих за регулярные точки
-    for (std::size_t i = 1; i < dim - 1; i++){
-        mDiag[i] = coefD;
+    if (mainDiag.size() < numOfXIntervals + 1){
+        mainDiag.resize(numOfXIntervals + 1);
     }
-    for (std::size_t i = 0; i < dim - 2; i++){
-        lDiag[i] = coefLU;
+    if (lowDiag.size() < numOfXIntervals){
+        lowDiag.resize(numOfXIntervals);
     }
-    for (std::size_t i = 1; i < dim - 1; i++){
-        uDiag[i] = coefLU;
+    if (upDiag.size() < numOfXIntervals){
+        upDiag.resize(numOfXIntervals);
+    }
+    if (fVec.size() < numOfXIntervals + 1){
+        fVec.resize(numOfXIntervals + 1);
     }
     
-    // Заполнение строк, отвечающих ГУ
-    switch (conds){
-        case LT_RT:
-            mDiag[0] = 1.0;
-            mDiag[dim - 1] = 1.0;
-            lDiag[dim - 2] = 0.0;
-            uDiag[0] = 0.0;
-            break;
-        case LT_RQ:
-            mDiag[0] = 1.0;
-            mDiag[dim - 1] = coefD;
-            lDiag[dim - 2] = 2.0 * coefLU;
-            uDiag[0] = 0.0;
-            break;
-        case LQ_RT:
-            mDiag[0] = coefD;
-            mDiag[dim - 1] = 1.0;
-            lDiag[dim - 2] = 0.0;
-            uDiag[0] = 2.0 * coefLU;
-            break;
-        case LQ_RQ:
-            mDiag[0] = coefD;
-            mDiag[dim - 1] = coefD;
-            lDiag[dim - 2] = 2.0 * coefLU;
-            uDiag[0] = 2.0 * coefLU;
-            break;
-        default:
-            mDiag[0] = 1.0;
-            mDiag[dim - 1] = 1.0;
-            lDiag[dim - 2] = 0.0;
-            uDiag[0] = 0.0;
-            break;
+    if (condsY[0] == Temp){
+        mainDiag[0] = 1.0;
+        upDiag[0] = 0.0;
+        fVec[0] = T(0.0, j * hY);
+    }else{
+        mainDiag[0] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
+        upDiag[0] = 2.0 / std::pow(hX, 2.0);
+        fVec[0] = -2.0 / tau * matrix[0][0] - secondPartialDiffY(matrix, 0, j, hX, hY, Q) - f(0.0, j * hY) - 2.0 / hX * Q(0.0, j * hY);
     }
-}
 
-template<typename Type>
-Type specialRightVecFuncX(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
-    return 2.0 / tau * fMatrix[i][j] + discrPartialDiffY(fMatrix, i, j, h2) + f(i * h1, j * h2);
-}
-
-template<typename Type>
-Type specialRightVecFuncY(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j){
-    return 2.0 / tau * fMatrix[i][j] + discrPartialDiffX(fMatrix, i, j, h1) + f(i * h1, j * h2);
-}
-
-template<typename Type>
-Type specialFirstCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*T)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j, 
-Type(*specialRightVecFunc)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)){
-    return T(i * h1, j * h2);
-}
-
-template<typename Type>
-Type specialSecondCondFunc(const std::vector<std::vector<Type>> &fMatrix, Type h1, Type h2, Type (*Q)(Type, Type), Type (*f)(Type, Type), Type tau, std::size_t i, std::size_t j,
-Type(*specialRightVecFunc)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)){
-    return -specialRightVecFunc(fMatrix, h1, h2, f, tau, i, j) - 2.0 / h1 * Q(i * h1 , j * h2);
-}
-
-template<typename Type>
-void chooseBound(Type(*&bound1)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)),
-Type(*&bound2)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)), CONDS_FLAG conds){
-    switch (conds){
-        case LT_RT:
-            bound1 = specialFirstCondFunc;
-            bound2 = specialFirstCondFunc;
-            break;
-        case LT_RQ:
-            bound1 = specialFirstCondFunc;
-            bound2 = specialSecondCondFunc;
-            break;
-        case LQ_RT:
-            bound1 = specialSecondCondFunc;
-            bound2 = specialFirstCondFunc;
-            break;
-        case LQ_RQ:
-            bound1 = specialSecondCondFunc;
-            bound2 = specialSecondCondFunc;
-            break;
-        default:
-            break;
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
+        lowDiag[i - 1] = 1.0 / std::pow(hX, 2.0);
+        mainDiag[i] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
+        upDiag[i] = 1.0 / std::pow(hX, 2.0);
+        f[i] = -2.0 / tau * matrix[i][j] - secondPartialDiffY(matrix, i, j, hX, hY, Q) - f(i * hX, j * hY);
     }
-}
 
-template<typename Type>
-void chooseFunc(Type(*& func1)(Type, Type), Type(*& func2)(Type, Type), Type(*& T)(Type, Type), Type(*& Q)(Type, Type), CONDS_FLAG conds){
-    switch (conds){
-        case LT_RT:
-            func1 = T;
-            func2 = T;
-            break;
-        case LT_RQ:
-            func1 = T;
-            func2 = Q;
-            break;
-        case LQ_RT:
-            func1 = Q;
-            func2 = T;
-            break;
-        case LQ_RQ:
-            func1 = Q;
-            func2 = Q;
-            break;
-        default:
-            break;
+    if (condsY[1] == Temp){
+        mainDiag[numOfXIntervals] = 1.0;
+        lowDiag[numOfXIntervals - 1] = 0.0;
+        fVec[numOfXIntervals] = T(numOfXIntervals * hX, j * hX);
+    }else{
+        mainDiag[numOfXIntervals] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
+        lowDiag[numOfXIntervals] = 2.0 / std::pow(hX, 2.0);
+        fVec[numOfXIntervals] = -2.0 / tau * matrix[numOfXIntervals][j] - secondPartialDiffY(matrix, numOfXIntervals, j, hX, hY, Q) - f(numOfXIntervals * hX, j * hY) - 2.0 / hX * Q(numOfXIntervals * hX, j * hY);
     }
+
+    uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfXIntervals + 1);
 }
 
 template<typename Type>
-Type solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
-CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type x, Type y), Type (*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){
+void getYTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t i, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsX, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPartialDiffX)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type))){
+    std::size_t numOfXIntervals = matrix.size();
+    std::size_t numOfYIntervals = matrix[0].size();
 
+    if (mainDiag.size() < numOfYIntervals + 1){
+        mainDiag.resize(numOfYIntervals + 1);
+    }
+    if (lowDiag.size() < numOfYIntervals){
+        lowDiag.resize(numOfYIntervals);
+    }
+    if (upDiag.size() < numOfYIntervals){
+        upDiag.resize(numOfYIntervals);
+    }
+    if (fVec.size() < numOfYIntervals + 1){
+        fVec.resize(numOfYIntervals + 1);
+    }
+    
+    if (condsX[0] == Temp){
+        mainDiag[0] = 1.0;
+        upDiag[0] = 0.0;
+        fVec[0] = T(i * hX, 0.0);
+    }else{
+        mainDiag[0] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
+        upDiag[0] = 2.0 / std::pow(hY, 2.0);
+        fVec[0] = -2.0 / tau * matrix[i][0] - secondPartialDiffX(matrix, i, 0, hX, hY, Q) - f(i * hX, 0.0) - 2.0 / hY * Q(i * hX, 0.0);
+    }
+    
+    for (std::size_t j = 1; j < numOfYIntervals; j++){
+        lowDiag[j - 1] = 1.0 / std::pow(hY, 2.0);
+        mainDiag[j] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
+        upDiag[j] = 1.0 / std::pow(hY, 2.0); 
+        f[j] = -2.0 / tau * matrix[i][j] - secondPartialDiffX(matrix, i, j, hX, hY, Q) - f(i * hX, j * hY);
+    }
+
+    if (condsX[1] == Temp){
+        mainDiag[numOfYIntervals] = 1.0;
+        lowDiag[numOfYIntervals] = 0.0;
+        fVec[numOfYIntervals] = T(i * numOfXIntervals, numOfYIntervals * hY);
+    }else{
+        mainDiag[numOfYIntervals] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
+        lowDiag[numOfYIntervals] = 2.0 / std::pow(hY, 2.0);
+        fVec[numOfYIntervals] = -2.0 / tau * matrix[i][numOfYIntervals] - secondPartialDiffX(matrix, i, numOfYIntervals, hX, hY, Q) - f(i * hX, numOfYIntervals * hY) - 2.0 / hY * Q(i * hX, numOfYIntervals * hY);
+    }
+
+    uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfYIntervals + 1);
+}
+
+template<typename Type>
+std::size_t solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
+const std::vector<BOUND_FLAG> &condsX, const std::vector<BOUND_FLAG> &condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type), Type eps){
     // Шаги сеток по X и Y соответсвенно 
     Type h1 = L1 / numOfXIntervals;
     Type h2 = L2 / numOfYIntervals;
@@ -4801,88 +4840,111 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type 
             solMatrixPrev[i].push_back(temp);
         }
     }
-
-    // Функции, отвечающие за вид вектора правой части при разных ГУ
-    Type (*boundLeft)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;
-    Type (*boundRight)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;    
-    Type (*boundTop)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;    
-    Type (*boundBottom)(const std::vector<std::vector<Type>>&, Type, Type, Type(*)(Type, Type), Type (*)(Type, Type), Type, std::size_t, std::size_t, Type(*)(const std::vector<std::vector<Type>> &, Type, Type, Type (*)(Type, Type), Type, std::size_t, std::size_t)) = nullptr;
-    chooseBound(boundTop, boundBottom, condsX);
-    chooseBound(boundLeft, boundRight, condsY);
-
-    // Функции, отвечающие за функцию, действующую на стенку при разных ГУ
-    Type (*funcLeft)(Type, Type) = nullptr;
-    Type (*funcRight)(Type, Type) = nullptr;
-    Type (*funcTop)(Type, Type) = nullptr;
-    Type (*funcBottom)(Type, Type) = nullptr;
-    chooseFunc(funcTop, funcBottom, T, Q, condsX);
-    chooseFunc(funcLeft, funcRight, T, Q, condsY);
+    fillBoundMatrixElems(solMatrix, T, condsX, h1, condsY, h2);
+    fillBoundMatrixElems(solMatrixPrev, T, condsX, h1, condsY, h2);
 
     // Первая итерация
-    std::vector<Type> tempVec(n);
+    std::vector<Type> tempVec(n); // Вектор для решения СЛАУ
 
     // Проход вдоль Ox2
-    fillTridiagMatrixOfSystem(numOfXIntervals + 1, mainDiag, lowDiag, upDiag, h1, tau, condsX);
-    for (std::size_t j = 1; j < numOfYIntervals; j++){
-        fVec[0] = boundTop(solMatrixPrev, h1, h2, funcTop, f, tau, 0, j, specialRightVecFuncX);  // Верхнее граничное условие 
-        for (std::size_t i = 1; i < numOfXIntervals; i++){ // Заполнение вектора правой части для регулярных точек
-            fVec[i] = -specialRightVecFuncX(solMatrixPrev, h1, h2, f, tau, i, j);
+    // Находим температуру при x2 = 0 (j = 0)
+    if (condsX[0] == Flux){
+        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYForward);
+        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+            solMatrix[i][0] = tempVec[i];
         }
-        fVec[numOfXIntervals] = boundBottom(solMatrixPrev, h1, h2, funcBottom, f, tau, numOfXIntervals, j, specialRightVecFuncX); // Нижнее граничное условие
-        uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfXIntervals + 1);
+    }
+    // Находим температуру для 0 < j < numOfYIntervals
+    for (std::size_t j = 1; j < numOfYIntervals; j++){
+        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYRegular);
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
             solMatrix[i][j] = tempVec[i];
+        }
+    }
+    // Находим температуру при x2 = L2 (j = numOfYIntervals)
+    if (condsX[1] == Flux){
+        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYBackward);
+        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+            solMatrix[i][numOfYIntervals] = tempVec[i];
         }
     }
 
     solMatrixPrev = solMatrix;
 
     // Проход вдоль Ox1
-    fillTridiagMatrixOfSystem(numOfYIntervals + 1, mainDiag, lowDiag, upDiag, h2, tau, condsY);
-    for (std::size_t i = 1; i < numOfXIntervals; i++){
-        fVec[0] = boundLeft(solMatrixPrev, h1, h2, funcLeft, f, tau, i, 0, specialRightVecFuncY); // Верхнее граничное условие 
-        for (std::size_t j = 1; j < numOfYIntervals; j++){ // Заполнение вектора правой части для регулярных точек
-            fVec[j] = -specialRightVecFuncY(solMatrixPrev, h1, h2, f, tau, i, j);
+    // Находим температуру при x1 = 0 (i = 0)
+    if (condsY[0] == Flux){
+        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXForward);
+        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+            solMatrix[0][j] = tempVec[j];
         }
-        fVec[numOfYIntervals] = boundRight(solMatrixPrev, h1, h2, funcRight, f, tau, i, numOfYIntervals, specialRightVecFuncY); // Нижнее граничное условие
-        uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfYIntervals + 1);
+    }
+    // Находим температуру для 0 < i < numOfXIntervals
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
+        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXRegular);
         for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
             solMatrix[i][j] = tempVec[j];
         }
     }
+    // Находим температуру при x1 = L1 (i = numOfXIntervals)
+    if (condsY[1] == Flux){
+        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXBackward);
+        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+            solMatrix[numOfXIntervals][j] = tempVec[j];
+        }
+    }
 
-    Type norm = normC2Ddiff(solMatrix, solMatrixPrev); 
+    std::size_t numOfIterations = 1; // Количество итераций
+    Type norm = normC2Ddiff(solMatrix, solMatrixPrev); // Норма C разности матриц
     while (norm > eps){
         
         solMatrixPrev = solMatrix;
 
         // Проход вдоль Ox2
-        fillTridiagMatrixOfSystem(numOfXIntervals + 1, mainDiag, lowDiag, upDiag, h1, tau, condsX);
-        for (std::size_t j = 1; j < numOfYIntervals; j++){
-            fVec[0] = boundTop(solMatrixPrev, h1, h2, funcTop, f, tau, 0, j, specialRightVecFuncX);  // Верхнее граничное условие 
-            for (std::size_t i = 1; i < numOfXIntervals; i++){ // Заполнение вектора правой части для регулярных точек
-                fVec[i] = -specialRightVecFuncX(solMatrixPrev, h1, h2, f, tau, i, j);
+        // Находим температуру при x2 = 0 (j = 0)
+        if (condsX[0] == Flux){
+            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYForward);
+            for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+                solMatrix[i][0] = tempVec[i];
             }
-            fVec[numOfXIntervals] = boundBottom(solMatrixPrev, h1, h2, funcBottom, f, tau, numOfXIntervals, j, specialRightVecFuncX); // Нижнее граничное условие
-            uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfXIntervals + 1);
+        }
+        // Находим температуру для 0 < j < numOfYIntervals
+        for (std::size_t j = 1; j < numOfYIntervals; j++){
+            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYRegular);
             for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
                 solMatrix[i][j] = tempVec[i];
+            }
+        }
+        // Находим температуру при x2 = L2 (j = numOfYIntervals)
+        if (condsX[1] == Flux){
+            getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsY, T, Q, f, secondPartialDiffYBackward);
+            for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
+                solMatrix[i][numOfYIntervals] = tempVec[i];
             }
         }
 
         solMatrixPrev = solMatrix;
 
         // Проход вдоль Ox1
-        fillTridiagMatrixOfSystem(numOfYIntervals + 1, mainDiag, lowDiag, upDiag, h2, tau, condsY);
-        for (std::size_t i = 1; i < numOfXIntervals; i++){
-            fVec[0] = boundLeft(solMatrixPrev, h1, h2, funcLeft, f, tau, i, 0, specialRightVecFuncY); // Верхнее граничное условие 
-            for (std::size_t j = 1; j < numOfYIntervals; j++){ // Заполнение вектора правой части для регулярных точек
-                fVec[j] = -specialRightVecFuncY(solMatrixPrev, h1, h2, f, tau, i, j);
+        // Находим температуру при x1 = 0 (i = 0)
+        if (condsY[0] == Flux){
+            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXForward);
+            for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+                solMatrix[0][j] = tempVec[j];
             }
-            fVec[numOfYIntervals] = boundRight(solMatrixPrev, h1, h2, funcRight, f, tau, i, numOfYIntervals, specialRightVecFuncY); // Нижнее граничное условие
-            uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, tempVec, numOfYIntervals + 1);
+        }
+        // Находим температуру для 0 < i < numOfXIntervals
+        for (std::size_t i = 1; i < numOfXIntervals; i++){
+            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXRegular);
             for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
                 solMatrix[i][j] = tempVec[j];
+            }
+        }
+        // Находим температуру при x1 = L1 (i = numOfXIntervals)
+        if (condsY[1] == Flux){
+            getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsX, T, Q, f, secondPartialDiffXBackward);
+            for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
+                solMatrix[numOfXIntervals][j] = tempVec[j];
             }
         }
 
@@ -4891,5 +4953,5 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type 
     
     // Вывод в файл решения
     writeMatrixFile(solMatrix, solutionFile);
-    return norm;
+    return numOfIterations;
 }

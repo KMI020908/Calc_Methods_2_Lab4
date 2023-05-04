@@ -25,7 +25,7 @@ Type(*U0)(Type x, Type y), Type(*xi)(Type x, Type y), Type(*psi)(Type x, Type y)
     std::vector<std::size_t> numOfIntervalsVec = {numOfXIntervals, numOfYIntervals};
     
     getFileNames(numOfEq, SOLUTION_FILE, DATA_FILE, INTERVAL_FILE);
-    solve2DStationaryPoissonEquation(SOLUTION_FILE, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, xi, psi, f, eps);
+    //solve2DStationaryPoissonEquation(SOLUTION_FILE, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, xi, psi, f, eps);
     writeVectorFile(dataVec, DATA_FILE);
     writeVectorFile(numOfIntervalsVec, INTERVAL_FILE);
 }
@@ -64,27 +64,55 @@ void temp_main(){
     condsX = LT_RT;
     condsY = LT_RT;
     eps = 1e-2;
-    getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
 
     // Второй тест
     numOfEq = 2;
     L1 = 1.0;
     L2 = 1.0;
-    f = f2;
+    f = f1;
     T = xi2;
     Q = psi2;
     U0 = U02;
     tau = 0.1;
-    numOfXIntervals = 50;
-    numOfYIntervals = 50;
+    numOfXIntervals = 10;
+    numOfYIntervals = 10;
     condsX = LT_RT;
     condsY = LQ_RQ;
     eps = 1e-2;
-    getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+}
+
+double tFunc(const std::vector<double> &point){
+    return point[0] + point[1];
 }
 
 int main(){
-    temp_main<double>();
+    //temp_main<double>();
+    
+    std::vector<std::vector<double>> fM(3);
+    for (size_t i = 0; i < 3; i++){
+        for (size_t j = 0; j < 5; j++){
+            fM[i].push_back(i + j);
+        }
+    }
+    std::cout << fM;
+    std::cout << '\n' << '\n';
 
+    std::size_t numOfXIntervals = 5;
+    double h1 = 2.0;
+    double tau = 2.0;
+    std::vector<double> md(numOfXIntervals + 1);
+    std::vector<double> ld(numOfXIntervals);
+    std::vector<double> ud(numOfXIntervals);
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
+        ld[i - 1] = 1.0 / std::pow(h1, 2.0);
+        md[i] = -2.0 * (1.0 / tau + 1.0 / std::pow(h1, 2.0));
+        ud[i] = 1.0 / std::pow(h1, 2.0);
+    }
+    std::cout << md << '\n';
+    std::cout << ld << '\n';
+    std::cout << ud << '\n';
+    
     return 0;
 }
