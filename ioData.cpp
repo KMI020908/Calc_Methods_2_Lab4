@@ -69,6 +69,28 @@ FILE_FLAG readMatrix(std::vector<std::vector<Type>> &matrix, const std::string& 
 }
 
 template<typename Type>
+FILE_FLAG readMatrix(std::vector<std::vector<Type>> &matrix, std::size_t rows, std::size_t cols, const std::string& IN_FILE_PATH){
+	std::ifstream file;
+	file.open(IN_FILE_PATH);
+	if (!file.is_open())
+		exit(NOT_OPEN);
+    std::vector<Type> hVec;
+    hVec.reserve(cols);
+    Type hValue = 0;
+    matrix.clear();
+    for (std::size_t i = 0; i < rows; i++){
+        for (std::size_t j = 0; j < cols; j++){ 
+            file >> hValue;
+            hVec.push_back(hValue);    
+        }
+        matrix.push_back(hVec);
+        hVec.clear();
+    }
+	file.close();
+	return IS_CLOSED;
+}
+
+template<typename Type>
 FILE_FLAG writeData(const std::vector<Type> &solution, const std::vector<Type> &startPoint, Type accuracy, const std::string& OUT_FILE_PATH, std::size_t numOfIt, 
 Type tao, Type omega){
 	std::ofstream file;

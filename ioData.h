@@ -103,4 +103,7 @@ std::string getFileNameHeatEq(std::size_t numOfEq, CONDS_FLAG flag, Type sigma, 
 
 std::string getFileNameQuasiHeatEq(std::size_t numOfEq, CONDS_FLAG flag, const std::string &name, const std::string &folder = "QuasilinearHeatEq");
 
+template<typename Type>
+FILE_FLAG readMatrix(std::vector<std::vector<Type>> &matrix, std::size_t rows, std::size_t cols, const std::string& IN_FILE_PATH);
+
 #endif

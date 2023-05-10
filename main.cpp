@@ -30,25 +30,45 @@ Type(*U0)(Type x, Type y), Type(*xi)(Type x, Type y), Type(*psi)(Type x, Type y)
     writeVectorFile(numOfIntervalsVec, INTERVAL_FILE);
 }
 
-// Оценка сходимости при разных sigma при известном аналитическом решении
+// Оценка порядка сходимости при разных sigma при известном аналитическом решении
 template<typename Type>
-void getRealSpeedEstimate(std::size_t numOfEq, Type (*realSol)(Type t, Type x), Type a, Type L, Type timeEnd,
-std::size_t numOfXIntervals, std::size_t numOfTimeIntervals, Type(*U0)(Type x), Type(*Ut0)(Type x), Type(*bound1)(Type t), Type(*bound2)(Type t)){ 
-    std::string SOLUTION_FILE = "D:\\Calc_Methods_2\\Lab3\\speedEstCrossScheme\\speed" + std::to_string(numOfEq) + ".txt";
-    getRealSpeedEstimateWaveEq(SOLUTION_FILE, realSol, a, L, timeEnd, numOfXIntervals, numOfTimeIntervals, U0, Ut0, bound1, bound2);
+void getCoverageEstimate(std::size_t numOfEq, Type(*realSol)(Type t, Type x, Type y), std::size_t numOfIt, Type L1, Type L2, Type timeEnd,
+std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals, CONDS_FLAG condsX, CONDS_FLAG condsY, 
+Type(*U0)(Type x, Type y), Type(*T)(Type x, Type y), Type(*Q)(Type x, Type y), Type(*f)(Type t, Type x, Type y)){ 
+    std::string SOLUTION_FILE = "D:\\Calc_Methods_2\\Lab4\\coverageEst\\coverage" + std::to_string(numOfEq) + ".txt";
+    getRealSolEstimatePoisson2DEq(SOLUTION_FILE, realSol, numOfIt, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, f);
 }
 
+template<typename Type>
+void getTimeCoverageEstimate(std::size_t numOfEq, Type L1, Type L2, Type tau0, Type tauEnd, std::size_t tauIntervals,
+std::size_t numOfXIntervals, std::size_t numOfYIntervals, CONDS_FLAG condsX, CONDS_FLAG condsY, 
+Type(*U0)(Type x, Type y), Type(*T)(Type x, Type y), Type(*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){
+    if (tauEnd > tau0){
+        std::string SOLUTION_FILE = "D:\\Calc_Methods_2\\Lab4\\coverageTimeEst\\coverage" + std::to_string(numOfEq) + ".txt";
+        std::string TAU_FILE = "D:\\Calc_Methods_2\\Lab4\\coverageTimeEst\\tau" + std::to_string(numOfEq) + ".txt";
+        std::vector<Type> tauVec;
+        std::vector<Type> errVec;
+        Type tauStep = (tauEnd - tau0) / tauIntervals;
+        for (std::size_t i = 0; i < tauIntervals; i++){
+            tauVec.push_back(tau0 + i * tauStep);
+            errVec.push_back(solve2DStationaryPoissonEquation(SOLUTION_FILE, L1, L2, tauVec[i], numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps));
+        }
+        writeVectorFile(tauVec, TAU_FILE);
+        writeVectorFile(errVec, SOLUTION_FILE);
+    }
+}
 
 template<typename Type>
 void temp_main(){
     std::size_t numOfEq;
-    Type L1, L2, tau, eps;
-    std::size_t numOfXIntervals, numOfYIntervals;
+    Type L1, L2, tau, eps, timeEnd;
+    std::size_t numOfXIntervals, numOfYIntervals, numOfTIntervals;
     CONDS_FLAG condsX, condsY;
     Type (*U0)(Type x, Type y) = nullptr;
     Type (*T)(Type x, Type y) = nullptr;
     Type (*Q)(Type x, Type y) = nullptr;
     Type (*f)(Type x, Type y) = nullptr;
+    Type (*F)(Type t, Type x, Type y) = nullptr;
 
     // Первый тест 
     numOfEq = 1;
@@ -59,28 +79,64 @@ void temp_main(){
     Q = defaultFunc;
     U0 = U01;
     tau = 0.1;
-    numOfXIntervals = 20;
-    numOfYIntervals = 20;
+    numOfXIntervals = 10;
+    numOfYIntervals = 10;
     condsX = LT_RT;
     condsY = LT_RT;
     eps = 1e-2;
-    getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
 
-    // Второй тест
+    // Второй тест 
     numOfEq = 2;
     L1 = 1.0;
     L2 = 1.0;
-    f = f1;
+    f = f2;
     T = xi2;
     Q = psi2;
     U0 = U02;
     tau = 0.1;
     numOfXIntervals = 10;
     numOfYIntervals = 10;
+    condsX = LQ_RQ;
+    condsY = LT_RT;
+    eps = 1e-2;
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    //getTimeCoverageEstimate(numOfEq, L1, L2, 0.001, 0.1, 20, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+
+    // Третий тест
+    numOfEq = 3;
+    L1 = 1.0;
+    L2 = 1.0;
+    f = f3;
+    T = xi3;
+    Q = psi3;
+    U0 = U03;
+    tau = 0.05;
+    numOfXIntervals = 10;
+    numOfYIntervals = 10;
     condsX = LT_RT;
     condsY = LQ_RQ;
     eps = 1e-2;
-    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+
+    // Четвертый тест 
+    numOfEq = 4;
+    L1 = 1.0;
+    L2 = 1.0;
+    timeEnd = 1.0;
+    F = f4;
+    T = xi4;
+    Q = defaultFunc;
+    U0 = U04;
+    numOfXIntervals = 10;
+    numOfYIntervals = 10;
+    numOfTIntervals = 10;
+    condsX = LT_RT;
+    condsY = LT_RT;
+    eps = 1e-2;
+    Type (*realSol)(Type, Type, Type) = [](Type t, Type x, Type y){return std::exp(-t) * std::sin(M_PI * x) * std::sin(M_PI * y);};
+    //getCoverageEstimate(numOfEq, realSol, 4, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, F);
+
 }
 
 int main(){
