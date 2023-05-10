@@ -40,7 +40,7 @@ Type(*U0)(Type x, Type y), Type(*T)(Type x, Type y), Type(*Q)(Type x, Type y), T
 }
 
 template<typename Type>
-void getTimeCoverageEstimate(std::size_t numOfEq, Type L1, Type L2, Type tau0, Type tauEnd, std::size_t tauIntervals,
+void getCoverageEstimateTau(std::size_t numOfEq, Type L1, Type L2, Type tau0, Type tauEnd, std::size_t tauIntervals,
 std::size_t numOfXIntervals, std::size_t numOfYIntervals, CONDS_FLAG condsX, CONDS_FLAG condsY, 
 Type(*U0)(Type x, Type y), Type(*T)(Type x, Type y), Type(*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps){
     if (tauEnd > tau0){
@@ -78,9 +78,9 @@ void temp_main(){
     T = xi1;
     Q = defaultFunc;
     U0 = U01;
-    tau = 0.1;
-    numOfXIntervals = 10;
-    numOfYIntervals = 10;
+    tau = 0.03;
+    numOfXIntervals = 50;
+    numOfYIntervals = 50;
     condsX = LT_RT;
     condsY = LT_RT;
     eps = 1e-2;
@@ -94,14 +94,14 @@ void temp_main(){
     T = xi2;
     Q = psi2;
     U0 = U02;
-    tau = 0.1;
-    numOfXIntervals = 10;
-    numOfYIntervals = 10;
+    tau = 0.03;
+    numOfXIntervals = 50;
+    numOfYIntervals = 50;
     condsX = LQ_RQ;
     condsY = LT_RT;
     eps = 1e-2;
     //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
-    //getTimeCoverageEstimate(numOfEq, L1, L2, 0.001, 0.1, 20, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    //getCoverageEstimateTau(numOfEq, L1, L2, 0.001, 0.1, 20, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
 
     // Третий тест
     numOfEq = 3;
@@ -111,13 +111,13 @@ void temp_main(){
     T = xi3;
     Q = psi3;
     U0 = U03;
-    tau = 0.05;
-    numOfXIntervals = 10;
-    numOfYIntervals = 10;
+    tau = 0.03;
+    numOfXIntervals = 50;
+    numOfYIntervals = 50;
     condsX = LT_RT;
     condsY = LQ_RQ;
     eps = 1e-2;
-    getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
 
     // Четвертый тест 
     numOfEq = 4;
@@ -137,10 +137,41 @@ void temp_main(){
     Type (*realSol)(Type, Type, Type) = [](Type t, Type x, Type y){return std::exp(-t) * std::sin(M_PI * x) * std::sin(M_PI * y);};
     //getCoverageEstimate(numOfEq, realSol, 4, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, F);
 
+    // Тест. Вариант 1
+    numOfEq = 5;
+    L1 = M_PI_2;
+    L2 = 1.0;
+    f = f5;
+    T = xi5;
+    Q = psi5;
+    U0 = U05;
+    tau = 0.03;
+    numOfXIntervals = 50;
+    numOfYIntervals = 50;
+    condsX = LQ_RQ;
+    condsY = LT_RT;
+    eps = 1e-2;
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+
+    // Тест. Вариант 9
+    numOfEq = 6;
+    L1 = 1.0;
+    L2 = 1.0;
+    f = f6;
+    T = xi6;
+    Q = psi6;
+    U0 = U06;
+    tau = 0.03;
+    numOfXIntervals = 50;
+    numOfYIntervals = 50;
+    condsX = LQ_RQ;
+    condsY = LT_RT;
+    eps = 1e-2;
+    //getPoisson2DEquationSolution(numOfEq, L1, L2, tau, numOfXIntervals, numOfYIntervals, condsX, condsY, U0, T, Q, f, eps);
+
 }
 
 int main(){
     temp_main<double>();
-    
     return 0;
 }

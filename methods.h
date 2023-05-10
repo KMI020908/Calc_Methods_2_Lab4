@@ -398,10 +398,53 @@ std::size_t numOfXIntervals, std::size_t numOfTimeIntervals, Type(*U0)(Type x), 
 
 // Лаб 4
 template<typename Type>
+Type maxVecElem(std::vector<Type> vec);
+
+template<typename Type>
 Type normC2Ddiff(const std::vector<std::vector<Type>> &m1, const std::vector<std::vector<Type>> &m2);
+
+// Сеточная вторая частная производная по X для РЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffXRegular(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type));
+
+// Сеточная вторая частная производная по X ВПЕРЕД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffXForward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type));
+
+// Сеточная вторая частная производная по X НАЗАД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffXBackward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type));
+
+// Сеточная вторая частная производная по Y для РЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffYRegular(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type));
+
+// Сеточная вторая частная производная по Y ВПЕРЕД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffYForward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type));
+
+// Сеточная вторая частная производная по Y НАЗАД для НЕРЕГУЛЯРНЫХ точек
+template<typename Type>
+Type secondPartialDiffYBackward(const std::vector<std::vector<Type>> &fMatrix, std::size_t i, std::size_t j, Type hX, Type hY, Type(*boundFlux)(Type, Type));
+
+// Заполняем элементы матрицы на границе, если задана температура
+template<typename Type>
+void fillBoundMatrixElems(std::vector<std::vector<Type>> &matrix, Type (*T)(Type, Type), const std::vector<BOUND_FLAG> &condsX, Type h1, const std::vector<BOUND_FLAG> &condsY, Type h2);
+
+template<typename Type>
+void getXTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t j, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsY, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPartialDiffY)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type)));
+
+template<typename Type>
+void getYTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t i, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsX, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPartialDiffX)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type)));
+
+void fillCondsVec(std::vector<BOUND_FLAG> &condsVec, CONDS_FLAG conds);
 
 template<typename Type>
 std::size_t solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
-CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type x, Type y), Type (*T)(Type x, Type y), Type (*Q)(Type x, Type y), Type(*f)(Type x, Type y), Type eps);
+CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type), Type eps);
 
 #endif

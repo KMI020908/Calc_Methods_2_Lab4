@@ -4817,108 +4817,6 @@ Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPa
     uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfYIntervals + 1);
 }
 
-// Для нестационарного f
-template<typename Type>
-void getXTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
-const std::vector<std::vector<Type>> &matrix, std::size_t j, std::size_t k, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsY, 
-Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*secondPartialDiffY)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type))){
-    std::size_t numOfXIntervals = matrix.size() - 1;
-    std::size_t numOfYIntervals = matrix[0].size() - 1;
-
-    if (mainDiag.size() < numOfXIntervals + 1){
-        mainDiag.resize(numOfXIntervals + 1);
-    }
-    if (lowDiag.size() < numOfXIntervals){
-        lowDiag.resize(numOfXIntervals);
-    }
-    if (upDiag.size() < numOfXIntervals){
-        upDiag.resize(numOfXIntervals);
-    }
-    if (fVec.size() < numOfXIntervals + 1){
-        fVec.resize(numOfXIntervals + 1);
-    }
-    
-    if (condsY[0] == Temp){
-        mainDiag[0] = 1.0;
-        upDiag[0] = 0.0;
-        fVec[0] = T(0.0, j * hY);
-    }else{
-        mainDiag[0] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
-        upDiag[0] = 2.0 / std::pow(hX, 2.0);
-        fVec[0] = -2.0 / tau * matrix[0][j] - secondPartialDiffY(matrix, 0, j, hX, hY, Q) - f(k * tau, 0.0, j * hY) - 2.0 / hX * Q(0.0, j * hY);
-    }
-
-    for (std::size_t i = 1; i < numOfXIntervals; i++){
-        lowDiag[i - 1] = 1.0 / std::pow(hX, 2.0);
-        mainDiag[i] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
-        upDiag[i] = 1.0 / std::pow(hX, 2.0);
-        Type a = secondPartialDiffY(matrix, i, j, hX, hY, Q);
-        fVec[i] = -2.0 / tau * matrix[i][j] - secondPartialDiffY(matrix, i, j, hX, hY, Q) - f(k * tau, i * hX, j * hY);
-    }
-
-    if (condsY[1] == Temp){
-        mainDiag[numOfXIntervals] = 1.0;
-        lowDiag[numOfXIntervals - 1] = 0.0;
-        fVec[numOfXIntervals] = T(numOfXIntervals * hX, j * hX);
-    }else{
-        mainDiag[numOfXIntervals] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
-        lowDiag[numOfXIntervals - 1] = 2.0 / std::pow(hX, 2.0);
-        fVec[numOfXIntervals] = -2.0 / tau * matrix[numOfXIntervals][j] - secondPartialDiffY(matrix, numOfXIntervals, j, hX, hY, Q) - f(k * tau, numOfXIntervals * hX, j * hY) - 2.0 / hX * Q(numOfXIntervals * hX, j * hY);
-    }
-
-    uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfXIntervals + 1);
-}
-
-template<typename Type>
-void getYTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
-const std::vector<std::vector<Type>> &matrix, std::size_t i, std::size_t k, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsX, 
-Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*secondPartialDiffX)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type))){
-    std::size_t numOfXIntervals = matrix.size() - 1;
-    std::size_t numOfYIntervals = matrix[0].size() - 1;
-
-    if (mainDiag.size() < numOfYIntervals + 1){
-        mainDiag.resize(numOfYIntervals + 1);
-    }
-    if (lowDiag.size() < numOfYIntervals){
-        lowDiag.resize(numOfYIntervals);
-    }
-    if (upDiag.size() < numOfYIntervals){
-        upDiag.resize(numOfYIntervals);
-    }
-    if (fVec.size() < numOfYIntervals + 1){
-        fVec.resize(numOfYIntervals + 1);
-    }
-    
-    if (condsX[0] == Temp){
-        mainDiag[0] = 1.0;
-        upDiag[0] = 0.0;
-        fVec[0] = T(i * hX, 0.0);
-    }else{
-        mainDiag[0] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
-        upDiag[0] = 2.0 / std::pow(hY, 2.0);
-        fVec[0] = -2.0 / tau * matrix[i][0] - secondPartialDiffX(matrix, i, 0, hX, hY, Q) - f(k * tau, i * hX, 0.0) - 2.0 / hY * Q(i * hX, 0.0);
-    }
-    
-    for (std::size_t j = 1; j < numOfYIntervals; j++){
-        lowDiag[j - 1] = 1.0 / std::pow(hY, 2.0);
-        mainDiag[j] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
-        upDiag[j] = 1.0 / std::pow(hY, 2.0); 
-        fVec[j] = -2.0 / tau * matrix[i][j] - secondPartialDiffX(matrix, i, j, hX, hY, Q) - f(k * tau, i * hX, j * hY);
-    }
-
-    if (condsX[1] == Temp){
-        mainDiag[numOfYIntervals] = 1.0;
-        lowDiag[numOfYIntervals - 1] = 0.0;
-        fVec[numOfYIntervals] = T(i * hX, numOfYIntervals * hY);
-    }else{
-        mainDiag[numOfYIntervals] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
-        lowDiag[numOfYIntervals - 1] = 2.0 / std::pow(hY, 2.0);
-        fVec[numOfYIntervals] = -2.0 / tau * matrix[i][numOfYIntervals] - secondPartialDiffX(matrix, i, numOfYIntervals, hX, hY, Q) - f(k * tau, i * hX, numOfYIntervals * hY) - 2.0 / hY * Q(i * hX, numOfYIntervals * hY);
-    }
-
-    uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfYIntervals + 1);
-}
-
 void fillCondsVec(std::vector<BOUND_FLAG> &condsVec, CONDS_FLAG conds){
     condsVec.resize(2);
     switch (conds){
@@ -5091,6 +4989,109 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
     return numOfIterations;
 }
 
+
+// Для нестационарного f
+template<typename Type>
+void getXTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t j, std::size_t k, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsY, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*secondPartialDiffY)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type))){
+    std::size_t numOfXIntervals = matrix.size() - 1;
+    std::size_t numOfYIntervals = matrix[0].size() - 1;
+
+    if (mainDiag.size() < numOfXIntervals + 1){
+        mainDiag.resize(numOfXIntervals + 1);
+    }
+    if (lowDiag.size() < numOfXIntervals){
+        lowDiag.resize(numOfXIntervals);
+    }
+    if (upDiag.size() < numOfXIntervals){
+        upDiag.resize(numOfXIntervals);
+    }
+    if (fVec.size() < numOfXIntervals + 1){
+        fVec.resize(numOfXIntervals + 1);
+    }
+    
+    if (condsY[0] == Temp){
+        mainDiag[0] = 1.0;
+        upDiag[0] = 0.0;
+        fVec[0] = T(0.0, j * hY);
+    }else{
+        mainDiag[0] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
+        upDiag[0] = 2.0 / std::pow(hX, 2.0);
+        fVec[0] = -2.0 / tau * matrix[0][j] - secondPartialDiffY(matrix, 0, j, hX, hY, Q) - f(k * tau, 0.0, j * hY) - 2.0 / hX * Q(0.0, j * hY);
+    }
+
+    for (std::size_t i = 1; i < numOfXIntervals; i++){
+        lowDiag[i - 1] = 1.0 / std::pow(hX, 2.0);
+        mainDiag[i] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
+        upDiag[i] = 1.0 / std::pow(hX, 2.0);
+        Type a = secondPartialDiffY(matrix, i, j, hX, hY, Q);
+        fVec[i] = -2.0 / tau * matrix[i][j] - secondPartialDiffY(matrix, i, j, hX, hY, Q) - f(k * tau, i * hX, j * hY);
+    }
+
+    if (condsY[1] == Temp){
+        mainDiag[numOfXIntervals] = 1.0;
+        lowDiag[numOfXIntervals - 1] = 0.0;
+        fVec[numOfXIntervals] = T(numOfXIntervals * hX, j * hX);
+    }else{
+        mainDiag[numOfXIntervals] = -2.0 * (1.0 / tau + 1.0 / std::pow(hX, 2.0));
+        lowDiag[numOfXIntervals - 1] = 2.0 / std::pow(hX, 2.0);
+        fVec[numOfXIntervals] = -2.0 / tau * matrix[numOfXIntervals][j] - secondPartialDiffY(matrix, numOfXIntervals, j, hX, hY, Q) - f(k * tau, numOfXIntervals * hX, j * hY) - 2.0 / hX * Q(numOfXIntervals * hX, j * hY);
+    }
+
+    uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfXIntervals + 1);
+}
+
+template<typename Type>
+void getYTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t i, std::size_t k, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsX, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*secondPartialDiffX)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type))){
+    std::size_t numOfXIntervals = matrix.size() - 1;
+    std::size_t numOfYIntervals = matrix[0].size() - 1;
+
+    if (mainDiag.size() < numOfYIntervals + 1){
+        mainDiag.resize(numOfYIntervals + 1);
+    }
+    if (lowDiag.size() < numOfYIntervals){
+        lowDiag.resize(numOfYIntervals);
+    }
+    if (upDiag.size() < numOfYIntervals){
+        upDiag.resize(numOfYIntervals);
+    }
+    if (fVec.size() < numOfYIntervals + 1){
+        fVec.resize(numOfYIntervals + 1);
+    }
+    
+    if (condsX[0] == Temp){
+        mainDiag[0] = 1.0;
+        upDiag[0] = 0.0;
+        fVec[0] = T(i * hX, 0.0);
+    }else{
+        mainDiag[0] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
+        upDiag[0] = 2.0 / std::pow(hY, 2.0);
+        fVec[0] = -2.0 / tau * matrix[i][0] - secondPartialDiffX(matrix, i, 0, hX, hY, Q) - f(k * tau, i * hX, 0.0) - 2.0 / hY * Q(i * hX, 0.0);
+    }
+    
+    for (std::size_t j = 1; j < numOfYIntervals; j++){
+        lowDiag[j - 1] = 1.0 / std::pow(hY, 2.0);
+        mainDiag[j] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
+        upDiag[j] = 1.0 / std::pow(hY, 2.0); 
+        fVec[j] = -2.0 / tau * matrix[i][j] - secondPartialDiffX(matrix, i, j, hX, hY, Q) - f(k * tau, i * hX, j * hY);
+    }
+
+    if (condsX[1] == Temp){
+        mainDiag[numOfYIntervals] = 1.0;
+        lowDiag[numOfYIntervals - 1] = 0.0;
+        fVec[numOfYIntervals] = T(i * hX, numOfYIntervals * hY);
+    }else{
+        mainDiag[numOfYIntervals] = -2.0 * (1.0 / tau + 1.0 / std::pow(hY, 2.0));
+        lowDiag[numOfYIntervals - 1] = 2.0 / std::pow(hY, 2.0);
+        fVec[numOfYIntervals] = -2.0 / tau * matrix[i][numOfYIntervals] - secondPartialDiffX(matrix, i, numOfYIntervals, hX, hY, Q) - f(k * tau, i * hX, numOfYIntervals * hY) - 2.0 / hY * Q(i * hX, numOfYIntervals * hY);
+    }
+
+    uniDimTridiagonalAlgoritm(mainDiag, lowDiag, upDiag, fVec, solution, numOfYIntervals + 1);
+}
+
 template<typename Type>
 Type solve2DHeatEquation(const std::string &solutionFile, Type (*realSol)(Type t, Type x, Type y), Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type, Type)){
@@ -5213,24 +5214,14 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
 template<typename Type>
 FILE_FLAG getRealSolEstimatePoisson2DEq(const std::string &speedFile, Type (*realSol)(Type t, Type x, Type y), std::size_t numOfIt, Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type, Type)){
-    
     std::vector<Type> errVec;
     std::size_t multCoeff = 4;
-
-    Type hX = L1 / numOfXIntervals;
-    Type hY = L2 / numOfYIntervals;
-    Type tau = timeEnd / numOfTIntervals;
     
-    errVec.push_back(solve2DHeatEquation(speedFile, realSol, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, f));
-
-    for (std::size_t m = 0; m < numOfIt - 1; m++){
-        
+    for (std::size_t m = 0; m < numOfIt; m++){
+        errVec.push_back(solve2DHeatEquation(speedFile, realSol, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, f));
         numOfXIntervals *= multCoeff;
         numOfYIntervals *= multCoeff;
         numOfTIntervals *= multCoeff;
-
-        //writeMatrixFile(realSolution, "tmp.txt");
-        errVec.push_back(solve2DHeatEquation(speedFile, realSol, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, f));
     }
 
     return writeVectorFile(errVec, speedFile);
