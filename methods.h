@@ -431,11 +431,13 @@ Type secondPartialDiffYBackward(const std::vector<std::vector<Type>> &fMatrix, s
 template<typename Type>
 void fillBoundMatrixElems(std::vector<std::vector<Type>> &matrix, Type (*T)(Type, Type), const std::vector<BOUND_FLAG> &condsX, Type h1, const std::vector<BOUND_FLAG> &condsY, Type h2);
 
+// Нахождение температуры вдоль Ox при f = f(x, y)
 template<typename Type>
 void getXTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
 const std::vector<std::vector<Type>> &matrix, std::size_t j, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsY, 
 Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type), Type(*secondPartialDiffY)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type)));
 
+// Нахождение температуры вдоль Oy при f = f(x, y)
 template<typename Type>
 void getYTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
 const std::vector<std::vector<Type>> &matrix, std::size_t i, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsX, 
@@ -446,5 +448,27 @@ void fillCondsVec(std::vector<BOUND_FLAG> &condsVec, CONDS_FLAG conds);
 template<typename Type>
 std::size_t solve2DStationaryPoissonEquation(const std::string &solutionFile, Type L1, Type L2, Type tau, std::size_t numOfXIntervals, std::size_t numOfYIntervals, 
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type), Type eps);
+
+// Нахождение температуры вдоль Ox при f = f(t, x, y)
+template<typename Type>
+void getXTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t j, std::size_t k, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsY, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*secondPartialDiffY)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type)));
+
+// Нахождение температуры вдоль Oy при f = f(t, x, y)
+template<typename Type>
+void getYTemperature(std::vector<Type> &solution, std::vector<Type> &lowDiag, std::vector<Type> &mainDiag, std::vector<Type> &upDiag, std::vector<Type> &fVec,
+const std::vector<std::vector<Type>> &matrix, std::size_t i, std::size_t k, Type hX, Type hY, Type tau, const std::vector<BOUND_FLAG> &condsX, 
+Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*secondPartialDiffX)(const std::vector<std::vector<Type>>&, std::size_t, std::size_t, Type, Type, Type(*)(Type, Type)));
+
+// Нахождение нормы невязки двумерного уравнения теплопроводности
+template<typename Type>
+Type get2DHeatEqNormOfResidual(Type (*realSol)(Type t, Type x, Type y), Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
+CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type, Type));
+
+// Нахождение норм при уменьшении шагов
+template<typename Type>
+FILE_FLAG getRealSolEstimatePoisson2DEq(const std::string &speedFile, Type (*realSol)(Type t, Type x, Type y), std::size_t numOfIt, Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
+CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type, Type));
 
 #endif

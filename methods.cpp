@@ -4869,67 +4869,16 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
         for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
             temp = U0(i * h1, j * h2);
             solMatrix[i].push_back(temp);
-            solMatrixPrev[i].push_back(temp);
+            solMatrixPrev[i].resize(numOfYIntervals + 1);
         }
     }
     fillBoundMatrixElems(solMatrix, T, condsXVec, h1, condsYVec, h2);
-    fillBoundMatrixElems(solMatrixPrev, T, condsXVec, h1, condsYVec, h2);
 
-    // Первая итерация
     std::vector<Type> tempVec(n); // Вектор для решения СЛАУ
+    std::size_t numOfIterations = 0; // Количество итераций
+    do{
+        numOfIterations++;
 
-    // Проход вдоль Ox2
-    // Находим температуру при x2 = 0 (j = 0)
-    if (condsXVec[0] == Flux){
-        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYForward);
-        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
-            solMatrix[i][0] = tempVec[i];
-        }
-    }
-    // Находим температуру для 0 < j < numOfYIntervals
-    for (std::size_t j = 1; j < numOfYIntervals; j++){
-        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, j, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYRegular);
-        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
-            solMatrix[i][j] = tempVec[i];
-        }
-    }
-    // Находим температуру при x2 = L2 (j = numOfYIntervals)
-    if (condsXVec[1] == Flux){
-        getXTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfYIntervals, h1, h2, tau, condsYVec, T, Q, f, secondPartialDiffYBackward);
-        for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
-            solMatrix[i][numOfYIntervals] = tempVec[i];
-        }
-    }
-
-    solMatrixPrev = solMatrix;
-
-    // Проход вдоль Ox1
-    // Находим температуру при x1 = 0 (i = 0)
-    if (condsYVec[0] == Flux){
-        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, 0, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXForward);
-        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
-            solMatrix[0][j] = tempVec[j];
-        }
-    }
-    // Находим температуру для 0 < i < numOfXIntervals
-    for (std::size_t i = 1; i < numOfXIntervals; i++){
-        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, i, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXRegular);
-        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
-            solMatrix[i][j] = tempVec[j];
-        }
-    }
-    // Находим температуру при x1 = L1 (i = numOfXIntervals)
-    if (condsYVec[1] == Flux){
-        getYTemperature(tempVec, lowDiag, mainDiag, upDiag, fVec, solMatrixPrev, numOfXIntervals, h1, h2, tau, condsXVec, T, Q, f, secondPartialDiffXBackward);
-        for (std::size_t j = 0; j < numOfYIntervals + 1; j++){
-            solMatrix[numOfXIntervals][j] = tempVec[j];
-        }
-    }
-
-    std::size_t numOfIterations = 1; // Количество итераций
-    Type norm = normC2Ddiff(solMatrix, solMatrixPrev) / tau; // Норма C разности матриц
-    while (norm > eps){
-        
         solMatrixPrev = solMatrix;
 
         // Проход вдоль Ox2
@@ -4979,10 +4928,8 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
                 solMatrix[numOfXIntervals][j] = tempVec[j];
             }
         }
-
-        norm = normC2Ddiff(solMatrix, solMatrixPrev) / tau; 
-        numOfIterations++; 
-    }
+ 
+    }while (normC2Ddiff(solMatrix, solMatrixPrev) / tau > eps);
     
     // Вывод в файл решения
     writeMatrixFile(solMatrix, solutionFile);
@@ -5093,7 +5040,7 @@ Type(*T)(Type, Type), Type(*Q)(Type, Type), Type(*f)(Type, Type, Type), Type(*se
 }
 
 template<typename Type>
-Type solve2DHeatEquation(const std::string &solutionFile, Type (*realSol)(Type t, Type x, Type y), Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
+Type get2DHeatEqNormOfResidual(Type (*realSol)(Type t, Type x, Type y), Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type, Type)){
     
     // Шаги сеток по X и Y соответсвенно 
@@ -5137,8 +5084,6 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
     fillBoundMatrixElems(solMatrix, T, condsXVec, h1, condsYVec, h2);
     fillBoundMatrixElems(solMatrixPrev, T, condsXVec, h1, condsYVec, h2);
 
-    //writeMatrixFile(solMatrix, "tmp.txt");
-
     std::vector<Type> tempVec(n); // Вектор для решения СЛАУ
     Type normOfResidual = 0.0;
     for (std::size_t k = 1; k < numOfTIntervals + 1; k++){
@@ -5156,7 +5101,6 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
             for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
                 solMatrix[i][j] = tempVec[i];
             }
-            //writeMatrixFile(solMatrix, "tmp.txt");
         }
         // Находим температуру при x2 = L2 (j = numOfYIntervals)
         if (condsXVec[1] == Flux){
@@ -5165,6 +5109,7 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
                 solMatrix[i][numOfYIntervals] = tempVec[i];
             }
         }
+
         solMatrixPrev = solMatrix;
 
         // Проход вдоль Ox1
@@ -5189,6 +5134,7 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
                 solMatrix[numOfXIntervals][j] = tempVec[j];
             }
         }
+
         solMatrixPrev = solMatrix;
         
         for (std::size_t i = 0; i < numOfXIntervals + 1; i++){
@@ -5202,12 +5148,8 @@ CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Typ
         if (normOfResidual < tempNorm){
             normOfResidual = tempNorm;
         }
-        
-        
     }
-    
-    // Вывод в файл решения
-    writeMatrixFile(solMatrix, solutionFile);
+
     return normOfResidual;
 }
 
@@ -5215,10 +5157,10 @@ template<typename Type>
 FILE_FLAG getRealSolEstimatePoisson2DEq(const std::string &speedFile, Type (*realSol)(Type t, Type x, Type y), std::size_t numOfIt, Type L1, Type L2, Type timeEnd, std::size_t numOfXIntervals, std::size_t numOfYIntervals, std::size_t numOfTIntervals,
 CONDS_FLAG condsX, CONDS_FLAG condsY, Type(*U0)(Type, Type), Type (*T)(Type, Type), Type (*Q)(Type, Type), Type(*f)(Type, Type, Type)){
     std::vector<Type> errVec;
-    std::size_t multCoeff = 4;
+    std::size_t multCoeff = 2;
     
     for (std::size_t m = 0; m < numOfIt; m++){
-        errVec.push_back(solve2DHeatEquation(speedFile, realSol, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, f));
+        errVec.push_back(get2DHeatEqNormOfResidual(realSol, L1, L2, timeEnd, numOfXIntervals, numOfYIntervals, numOfTIntervals, condsX, condsY, U0, T, Q, f));
         numOfXIntervals *= multCoeff;
         numOfYIntervals *= multCoeff;
         numOfTIntervals *= multCoeff;
